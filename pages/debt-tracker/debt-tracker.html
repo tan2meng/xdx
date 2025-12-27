@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钱还完了吗？</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+    <!-- Using a simple emoji favicon for now -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header & Income Section -->
+        <header class="main-header">
+            <div class="header-content">
+                <h1>钱还完了吗？</h1>
+            </div>
+            <div class="income-setting">
+                <label for="monthly-income">💰 月收入 (￥)</label>
+                <input type="number" id="monthly-income" placeholder="输入你的月收入" onchange="app.updateIncome(this.value)">
+            </div>
+        </header>
+
+        <!-- Dashboard Stats -->
+        <section class="dashboard-stats">
+            <div class="stat-card total-debt">
+                <h3>总负债</h3>
+                <div class="value" id="disp-total-debt">￥0.00</div>
+            </div>
+            <div class="stat-card remaining">
+                <h3>剩余待还</h3>
+                <div class="value" id="disp-remaining">￥0.00</div>
+            </div>
+            <div class="stat-card paid">
+                <h3>已还金额</h3>
+                <div class="value" id="disp-paid">￥0.00</div>
+            </div>
+            <div class="stat-card fines">
+                <h3>逾期罚金</h3>
+                <div class="value" id="disp-fines">￥0.00</div>
+            </div>
+        </section>
+
+        <!-- Freedom Countdown -->
+        <section class="freedom-meter">
+            <div class="meter-header">
+                <h2>🎉 自由倒计时</h2>
+                <span class="freedom-time" id="freedom-time-text">计算中...</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="freedom-progress" style="width: 0%"></div>
+            </div>
+            <p class="quote" id="freedom-quote">加油！每一分还款都在让你更自由。</p>
+        </section>
+
+        <!-- Platform Controls -->
+        <div class="controls-bar">
+            <h2>我的借款平台</h2>
+            <button class="btn-primary" onclick="app.openModal('modal-platform')">+ 添加平台</button>
+        </div>
+
+        <!-- Platforms Grid -->
+        <section class="platforms-grid" id="platforms-container">
+            <!-- Platform cards will be injected here -->
+        </section>
+
+        <!-- Empty State (Hidden by default) -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">🏝️</div>
+            <p>还没有添加任何借款。<br>是已经财务自由了吗？</p>
+        </div>
+
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Add/Edit Platform Modal -->
+    <div id="modal-platform" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="platform-modal-title">添加借款平台</h3>
+                <button class="close-btn" onclick="app.closeModal('modal-platform')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>平台名称</label>
+                    <input type="text" id="input-platform-name" placeholder="例如：支付宝、微粒贷">
+                </div>
+                <div class="form-group">
+                    <label>图标 (Emoji)</label>
+                    <div class="emoji-picker" id="emoji-options">
+                        <span onclick="app.selectEmoji('💳', this)" class="emoji-opt">💳</span>
+                        <span onclick="app.selectEmoji('🐜', this)" class="emoji-opt">🐜</span>
+                        <span onclick="app.selectEmoji('🛍️', this)" class="emoji-opt">🛍️</span>
+                        <span onclick="app.selectEmoji('💸', this)" class="emoji-opt">💸</span>
+                        <span onclick="app.selectEmoji('🏠', this)" class="emoji-opt">🏠</span>
+                    </div>
+                    <input type="hidden" id="input-platform-icon" value="🏦">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="app.closeModal('modal-platform')">取消</button>
+                <button class="btn-primary" onclick="app.savePlatform()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loan Management Modal -->
+    <div id="modal-loan" class="modal-overlay hidden">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3>管理借款 - <span id="current-platform-name"></span></h3>
+                <button class="close-btn" onclick="app.closeModal('modal-loan')">×</button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Add Loan Form -->
+                <div class="add-loan-form-section">
+                    <h4>添加/编辑 记录</h4>
+                    <input type="hidden" id="input-loan-id">
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label>借款金额 (￥)</label>
+                            <input type="number" id="input-loan-amount" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>借款利率 (%)</label>
+                            <!-- Suggesting storing as annual rate or simple percentage -->
+                            <input type="number" id="input-loan-rate" placeholder="年化利率%" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label>借款日期</label>
+                            <input type="date" id="input-loan-date">
+                        </div>
+                        <div class="form-group">
+                            <label>借款期限 (月)</label>
+                            <input type="number" id="input-loan-term" placeholder="12">
+                        </div>
+                    </div>
+
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label>逾期罚金 (￥)</label>
+                            <input type="number" id="input-loan-penalty" placeholder="0.00" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label>已还金额 (￥)</label>
+                            <input type="number" id="input-loan-paid" placeholder="0.00" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn-primary full-width" onclick="app.saveLoan()">保存此笔借款</button>
+                    </div>
+                </div>
+
+                <!-- Loans List in Modal -->
+                <div class="loans-list-section">
+                    <h4>当前借款列表</h4>
+                    <div id="loans-list-container" class="loans-list">
+                        <!-- Loan items injected here -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

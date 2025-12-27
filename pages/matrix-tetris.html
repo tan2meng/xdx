@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matrix Tetris: Glitch Edition</title>
+    <!-- 引入 MediaPipe Holistic 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧱</text></svg>">
+
+    <!-- 引入像素字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #0f0;
+            font-family: 'LXGW WenKai TC', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overscroll-behavior: none;
+        }
+
+        /* 背景代码雨 Canvas */
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        /* 游戏容器 */
+        #gameContainer {
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 10;
+            transform: scale(1.3);
+            transform-origin: center center;
+            margin: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .panel {
+            border: 2px solid #0f0;
+            box-shadow: 0 0 10px #0f0, inset 0 0 10px #0f0;
+            background: rgba(0, 20, 0, 0.85);
+            padding: 10px;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        #infoPanel {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+            height: 600px;
+            gap: 15px;
+            position: relative;
+            text-align: center;
+        }
+
+        /* 视频容器样式 */
+        .video-container {
+            position: relative; 
+            width: 100%;
+            cursor: pointer;
+        }
+
+        #webcamPreview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            transform: scaleX(-1);
+            border: 1px solid #050;
+            opacity: 0.8;
+            /* 默认滤镜 */
+            filter: blur(2px) sepia(30%) hue-rotate(40deg) brightness(100%) contrast(100%);
+            transition: filter 0.3s ease, opacity 0.3s ease;
+        }
+
+        /* 去除滤镜的类 */
+        #webcamPreview.no-filter {
+            filter: none !important;
+            opacity: 1 !important;
+            border-color: #0f0;
+        }
+
+        /* 视频悬停提示文字 */
+        #videoTooltip {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border: 1px solid #0f0;
+            pointer-events: none; /* 让鼠标事件穿透到视频上 */
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        .video-container:hover #videoTooltip {
+            opacity: 1;
+        }
+
+        /* 头部辅助线Canvas */
+        #guideCanvas {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 200px;
+            height: 150px;
+            pointer-events: none;
+            transform: scaleX(-1);
+        }
+
+        .stat-box {
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #0a0;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        /* 下一个方块预览 Canvas */
+        #nextPieceCanvas {
+            width: 100px;
+            height: 80px;
+            margin: 5px auto 0;
+            display: block;
+            background: rgba(0, 0, 0, 0);
+        }
+
+        #gestureHint {
+            font-size: 0.85rem;
+            color: #8f8;
+            line-height: 1.3;
+        }
+
+        #gestureHint b {
+            color: #fff;
+            text-shadow: 0 0 5px #fff;
+        }
+
+        #startProgress {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 10px solid rgba(0, 50, 0, 0.5);
+            display: none !important;
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            color: #fff;
+            text-shadow: 0 0 10px #0f0;
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 4rem;
+            text-shadow: 0 0 20px #0f0;
+            margin: 0;
+            animation: pulse 2s infinite;
+        }
+
+        .btn {
+            background: #000;
+            color: #0f0;
+            border: 2px solid #0f0;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            font-family: 'LXGW WenKai TC', monospace;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 10px #0f0;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #0f0;
+            color: #000;
+        }
+
+        .difficulty-select {
+            margin: 20px 0;
+        }
+
+        .difficulty-btn {
+            background: transparent;
+            border: 1px solid #050;
+            color: #050;
+            margin: 0 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'LXGW WenKai TC';
+            font-size: 1.2rem;
+        }
+
+        .difficulty-btn.active {
+            border-color: #0f0;
+            color: #0f0;
+            box-shadow: 0 0 5px #0f0;
+        }
+
+        @keyframes pulse {
+            0% { text-shadow: 0 0 10px #0f0; opacity: 1; }
+            50% { text-shadow: 0 0 20px #0f0; opacity: 0.8; }
+            100% { text-shadow: 0 0 10px #0f0; opacity: 1; }
+        }
+
+        #countdown {
+            font-size: 16rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 50;
+            text-shadow: 0 0 30px #0f0;
+        }
+
+        @media (max-width: 1024px) {
+            #gameContainer { transform: scale(0.9); }
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 3rem; }
+            #gameContainer {
+                transform: scale(0.65);
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            #gameCanvas { box-shadow: 0 0 5px #0f0; }
+            #infoPanel {
+                width: 300px;
+                height: auto;
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: space-around;
+                align-items: center;
+                padding: 5px;
+            }
+            .video-container {
+                width: 100px !important;
+                height: 75px !important;
+                margin-right: 5px;
+            }
+            #webcamPreview, #guideCanvas {
+                width: 100px !important;
+                height: 75px !important;
+                border: 1px solid #0f0;
+            }
+            #guideCanvas { left: 0; top: 0; }
+            .stat-box {
+                border-bottom: none;
+                border-right: 1px solid #030;
+                padding: 0 10px;
+                text-align: center;
+            }
+            .stat-box:last-child { border-right: none; }
+            .stat-value { font-size: 1.5rem; }
+            #gestureHint {
+                width: 100%;
+                font-size: 0.8rem;
+                text-align: center;
+                border-top: 1px solid #030;
+                margin-top: 5px;
+                padding-top: 5px;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+            }
+            #gestureHint p { margin: 0; }
+            #nextPieceCanvas { transform: scale(0.8); }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 背景代码雨 -->
+    <canvas id="bgCanvas"></canvas>
+
+    <!-- 游戏主界面 -->
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="300" height="600" class="panel"></canvas>
+
+        <div id="infoPanel" class="panel">
+            <div class="video-container">
+                <video id="webcamPreview" playsinline></video>
+                <canvas id="guideCanvas"></canvas>
+                <div id="videoTooltip">点击去掉滤镜</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">Next</div>
+                <canvas id="nextPieceCanvas" width="100" height="80"></canvas>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="scoreDisplay">0</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="levelDisplay">NORMAL</div>
+            </div>
+
+            <div id="gestureHint">
+                <p>✋ <b>举起双手:</b> 开始</p>
+                <p>🙎 <b>头歪左右:</b> 移动</p>
+                <p>🤛 <b>右手握拳:</b> 旋转</p>
+                <p>✊ <b>左手握拳:</b> 加速</p>
+            </div>
+        </div>
+
+        <div id="startProgress">
+            <span id="progressText">0%</span>
+        </div>
+    </div>
+
+    <!-- 倒计时数字 -->
+    <div id="countdown">3</div>
+
+    <!-- 遮罩层 & 菜单 -->
+    <div id="overlay">
+        <h1>THE MATRIX<br>TETRIS</h1>
+        <p>System Ready... Waiting for input.</p>
+
+        <div class="difficulty-select">
+            <button class="difficulty-btn" onclick="setDifficulty('easy')">EASY</button>
+            <button class="difficulty-btn active" onclick="setDifficulty('normal')">NORMAL</button>
+            <button class="difficulty-btn" onclick="setDifficulty('hard')">HARD</button>
+        </div>
+
+        <button class="btn" id="startBtn">INITIALIZE CAMERA</button>
+        <p style="font-size: 0.8rem; margin-top: 10px; color: #555;">(Please allow camera access)</p>
+    </div>
+
+    <script>
+        /**
+         * AUDIO SYSTEM - GLITCH EDITION
+         * 统一使用更具科技感的锯齿波(Sawtooth)和方波(Square)，并添加加速音效逻辑
+         */
+        class SoundFX {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.enabled = false;
+                
+                // 加速音效专用节点
+                this.accelOsc = null;
+                this.accelGain = null;
+            }
+
+            enable() {
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                this.enabled = true;
+            }
+
+            // 通用发声方法
+            playTone(freq, type, duration, vol = 0.1, slideTo = null) {
+                if (!this.enabled) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                // 如果有滑音效果 (例如 GameOver)
+                if (slideTo) {
+                    osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+                }
+
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            // 1. 旋转：短促高频的数字信号声
+            rotate() { 
+                this.playTone(660, 'square', 0.05, 0.08); 
+            }
+
+            // 2. 移动：非常短的机械卡顿声
+            move() { 
+                this.playTone(220, 'sawtooth', 0.03, 0.05); 
+            }
+
+            // 3. 锁定/掉落：低沉的撞击声
+            drop() { 
+                this.playTone(100, 'square', 0.15, 0.2, 50); 
+            }
+
+            // 4. 消除行：高科技充能+释放声
+            clear() { 
+                // 双重音效
+                this.playTone(440, 'square', 0.2, 0.1, 880); 
+                setTimeout(() => this.playTone(880, 'sawtooth', 0.3, 0.1, 1760), 100); 
+            }
+
+            // 5. 游戏结束：系统崩溃的降调声
+            gameOver() { 
+                this.stopAcceleration(); // 确保加速音效停止
+                this.playTone(300, 'sawtooth', 1.5, 0.3, 30); 
+                setTimeout(() => this.playTone(100, 'square', 1.0, 0.3, 10), 200);
+            }
+
+            // 6. 游戏开始：启动声
+            start() { 
+                this.playTone(220, 'square', 0.6, 0.1, 880); 
+            }
+
+            // 7. 倒计时滴答声
+            tick() { 
+                this.playTone(880, 'sine', 0.05, 0.05); 
+            }
+
+            // 8. 双手举起时的充能音效 (保持原逻辑，微调参数)
+            engineRev(progress) {
+                if (!this.enabled) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                const freq = 60 + (Math.pow(progress, 2) * 800);
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                const vol = 0.05 + (progress * 0.1);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            // 9. 持续加速音效 (New)
+            startAcceleration() {
+                if (!this.enabled || this.accelOsc) return; // 已在播放或静音
+
+                this.accelOsc = this.ctx.createOscillator();
+                this.accelGain = this.ctx.createGain();
+
+                // 模拟推进器或数据流的高速声
+                this.accelOsc.type = 'sawtooth';
+                this.accelOsc.frequency.setValueAtTime(110, this.ctx.currentTime);
+                // 频率随时间轻微上升
+                this.accelOsc.frequency.linearRampToValueAtTime(220, this.ctx.currentTime + 3.0);
+
+                this.accelGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                // 快速淡入
+                this.accelGain.gain.linearRampToValueAtTime(0.1, this.ctx.currentTime + 0.2);
+
+                // 添加低通滤波器让声音不那么刺耳 (可选，此处保持简单直接连接)
+                this.accelOsc.connect(this.accelGain);
+                this.accelGain.connect(this.ctx.destination);
+
+                this.accelOsc.start();
+            }
+
+            stopAcceleration() {
+                if (this.accelOsc) {
+                    const now = this.ctx.currentTime;
+                    // 防止爆音，快速淡出
+                    this.accelGain.gain.cancelScheduledValues(now);
+                    this.accelGain.gain.setValueAtTime(this.accelGain.gain.value, now);
+                    this.accelGain.gain.linearRampToValueAtTime(0, now + 0.1);
+                    
+                    this.accelOsc.stop(now + 0.15);
+                    
+                    // 清理引用
+                    const oldOsc = this.accelOsc;
+                    const oldGain = this.accelGain;
+                    setTimeout(() => { 
+                        oldOsc.disconnect(); 
+                        oldGain.disconnect();
+                    }, 200);
+                    
+                    this.accelOsc = null;
+                    this.accelGain = null;
+                }
+            }
+        }
+
+        const sfx = new SoundFX();
+
+        /**
+         * BACKGROUND MATRIX RAIN
+         */
+        const bgCanvas = document.getElementById('bgCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        function resizeBg() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeBg);
+        resizeBg();
+
+        const matrixChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+        const fontSize = 16;
+        let columns = Math.floor(window.innerWidth / fontSize);
+        const drops = [];
+        for (let x = 0; x < columns; x++) drops[x] = 1;
+
+        let rainFrameCount = 0;
+
+        function drawMatrixRain() {
+            rainFrameCount++;
+            if (rainFrameCount % 2 !== 0) {
+                requestAnimationFrame(drawMatrixRain);
+                return;
+            }
+
+            bgCtx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            bgCtx.fillStyle = "#0F0";
+            bgCtx.font = fontSize + "px 'LXGW WenKai TC'";
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars.charAt(Math.floor(Math.random() * matrixChars.length));
+                bgCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > bgCanvas.height && Math.random() > 0.975)
+                    drops[i] = 0;
+                drops[i]++;
+            }
+            requestAnimationFrame(drawMatrixRain);
+        }
+        drawMatrixRain();
+
+        /**
+         * TETRIS GAME LOGIC
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('nextPieceCanvas');
+        const nextCtx = nextCanvas.getContext('2d');
+        const scoreEl = document.getElementById('scoreDisplay');
+        const levelEl = document.getElementById('levelDisplay');
+        const overlay = document.getElementById('overlay');
+        const countdownEl = document.getElementById('countdown');
+
+        const ROWS = 20;
+        const COLS = 10;
+        const BLOCK_SIZE = 30;
+
+        const TETROMINOS = [
+            [],
+            [[1, 1, 1, 1]], // I
+            [[1, 1], [1, 1]], // O
+            [[0, 1, 0], [1, 1, 1]], // T
+            [[1, 0, 0], [1, 1, 1]], // L
+            [[0, 0, 1], [1, 1, 1]], // J
+            [[0, 1, 1], [1, 1, 0]], // S
+            [[1, 1, 0], [0, 1, 1]]  // Z
+        ];
+
+        const COLORS = ['transparent', '#aaffaa', '#88ff88', '#66ff66', '#44ff44', '#22ff22', '#00ff00', '#00dd00'];
+
+        let board = [];
+        let score = 0;
+        let currentPiece = null;
+        let nextPieceIndex = null;
+        let boardPieceIndex = 1;
+        let currentX = 0;
+        let currentY = 0;
+        let dropStart = Date.now();
+        let gameOver = false;
+        let isPaused = true;
+        let isAccelerating = false;
+        let isGameStarting = false;
+
+        // Difficulty
+        let difficulty = 'normal';
+        let baseDropSpeed = 800;
+        let fastDropSpeed = 50;
+
+        function setDifficulty(level) {
+            difficulty = level;
+            document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            levelEl.innerText = level.toUpperCase();
+            if (level === 'easy') baseDropSpeed = 1200;
+            if (level === 'normal') baseDropSpeed = 800;
+            if (level === 'hard') baseDropSpeed = 400;
+        }
+
+        function initBoard() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        }
+
+        /**
+         * 绘制单个方块 - 修改版：支持 dx, dy 像素级偏移 (用于抖动效果)
+         */
+        function drawBlock(targetCtx, x, y, colorIndex, size = BLOCK_SIZE, dx = 0, dy = 0) {
+            // 计算实际渲染坐标（增加偏移量）
+            const renderX = x * size + dx;
+            const renderY = y * size + dy;
+
+            targetCtx.fillStyle = COLORS[colorIndex];
+            targetCtx.shadowBlur = 10;
+            targetCtx.shadowColor = COLORS[colorIndex];
+            targetCtx.fillRect(renderX, renderY, size, size);
+
+            targetCtx.strokeStyle = '#003300';
+            targetCtx.lineWidth = 2;
+            targetCtx.shadowBlur = 0;
+            targetCtx.strokeRect(renderX, renderY, size, size);
+
+            // Matrix glyph
+            targetCtx.fillStyle = "rgba(0, 50, 0, 0.8)";
+            targetCtx.font = (size - 5) + "px 'LXGW WenKai TC'";
+            targetCtx.fillText(String.fromCharCode(0x30A0 + Math.random() * 96), renderX + 5, renderY + (size * 0.75));
+        }
+
+        /**
+         * 绘制棋盘 - 修改版：为当前下落方块添加随机抖动
+         */
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#002200';
+            ctx.lineWidth = 1;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    ctx.strokeRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    // 静态方块不需要抖动
+                    if (board[r][c]) drawBlock(ctx, c, r, board[r][c]);
+                }
+            }
+
+            if (currentPiece) {
+                // 根据是否加速决定抖动强度
+                const shakeIntensity = isAccelerating ? 3.5 : 1.5; 
+
+                for (let r = 0; r < currentPiece.length; r++) {
+                    for (let c = 0; c < currentPiece[r].length; c++) {
+                        if (currentPiece[r][c]) {
+                            // 生成随机偏移量，创造 Glitch 效果
+                            const jitterX = (Math.random() - 0.5) * shakeIntensity;
+                            const jitterY = (Math.random() - 0.5) * shakeIntensity;
+                            drawBlock(ctx, currentX + c, currentY + r, boardPieceIndex, BLOCK_SIZE, jitterX, jitterY);
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawNextPiece() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            if (!nextPieceIndex) return;
+
+            const piece = TETROMINOS[nextPieceIndex];
+            const size = 20;
+            const pWidth = piece[0].length * size;
+            const pHeight = piece.length * size;
+            const offsetX = (nextCanvas.width - pWidth) / 2;
+            const offsetY = (nextCanvas.height - pHeight) / 2;
+
+            for (let r = 0; r < piece.length; r++) {
+                for (let c = 0; c < piece[r].length; c++) {
+                    if (piece[r][c]) {
+                        nextCtx.fillStyle = COLORS[nextPieceIndex];
+                        nextCtx.shadowBlur = 5;
+                        nextCtx.shadowColor = COLORS[nextPieceIndex];
+                        nextCtx.fillRect(offsetX + c * size, offsetY + r * size, size, size);
+                        nextCtx.strokeStyle = '#003300';
+                        nextCtx.strokeRect(offsetX + c * size, offsetY + r * size, size, size);
+                    }
+                }
+            }
+        }
+
+        function newPiece() {
+            if (nextPieceIndex === null) {
+                nextPieceIndex = Math.floor(Math.random() * (TETROMINOS.length - 1)) + 1;
+            }
+
+            boardPieceIndex = nextPieceIndex;
+            currentPiece = TETROMINOS[boardPieceIndex];
+
+            nextPieceIndex = Math.floor(Math.random() * (TETROMINOS.length - 1)) + 1;
+            drawNextPiece();
+
+            currentX = Math.floor(COLS / 2) - Math.floor(currentPiece[0].length / 2);
+            currentY = 0;
+
+            if (checkCollision(0, 0, currentPiece)) {
+                gameOver = true;
+                sfx.gameOver(); // 这里已经包含了 stopAcceleration
+                isPaused = true;
+                overlay.style.display = 'flex';
+                overlay.innerHTML = `<h1>GAME OVER<br>SCORE: ${score}</h1><button class="btn" onclick="triggerStart()">RESTART</button>`;
+            }
+        }
+
+        function checkCollision(x, y, piece) {
+            for (let r = 0; r < piece.length; r++) {
+                for (let c = 0; c < piece[r].length; c++) {
+                    if (!piece[r][c]) continue;
+                    let newX = currentX + c + x;
+                    let newY = currentY + r + y;
+                    if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
+                    if (newY < 0) continue;
+                    if (board[newY][newX]) return true;
+                }
+            }
+            return false;
+        }
+
+        function rotatePiece() {
+            if (isPaused || gameOver) return;
+            let newPiece = currentPiece[0].map((val, index) => currentPiece.map(row => row[index]).reverse());
+            if (!checkCollision(0, 0, newPiece)) {
+                currentPiece = newPiece;
+                sfx.rotate();
+                drawBoard();
+            }
+        }
+
+        function movePiece(dir) {
+            if (isPaused || gameOver) return;
+            if (!checkCollision(dir, 0, currentPiece)) {
+                currentX += dir;
+                sfx.move();
+                drawBoard();
+            }
+        }
+
+        function lockPiece() {
+            // 如果处于加速状态，锁定瞬间停止音效
+            if (isAccelerating) {
+                sfx.drop(); // 播放锁定撞击音
+            } else {
+                sfx.drop();
+            }
+
+            for (let r = 0; r < currentPiece.length; r++) {
+                for (let c = 0; c < currentPiece[r].length; c++) {
+                    if (!currentPiece[r][c]) continue;
+                    if (currentY + r < 0) {
+                        gameOver = true;
+                        sfx.gameOver();
+                        break;
+                    }
+                    board[currentY + r][currentX + c] = boardPieceIndex;
+                }
+            }
+
+            let linesCleared = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell !== 0)) {
+                    board.splice(r, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    linesCleared++;
+                    r++;
+                }
+            }
+
+            if (linesCleared > 0) {
+                sfx.clear();
+                score += linesCleared * 100 * (linesCleared);
+                scoreEl.innerText = score;
+            }
+
+            newPiece();
+        }
+
+        /**
+         * 游戏主循环 - 修改版：分离逻辑和渲染
+         */
+        function updateGame() {
+            if (isPaused || gameOver) {
+                // 双重保险：暂停时停止加速音效
+                sfx.stopAcceleration();
+                return;
+            }
+            
+            let now = Date.now();
+            let speed = isAccelerating ? fastDropSpeed : baseDropSpeed;
+            
+            // 逻辑更新 (控制下落)
+            if (now - dropStart > speed) {
+                if (!checkCollision(0, 1, currentPiece)) currentY++;
+                else lockPiece();
+                dropStart = Date.now();
+            }
+            
+            // 渲染更新 (每帧调用以获得流畅的抖动动画)
+            drawBoard();
+            
+            requestAnimationFrame(updateGame);
+        }
+
+        window.triggerStart = function () {
+            startGameSequence();
+        }
+
+        function startGameSequence() {
+            sfx.enable();
+            sfx.stopAcceleration(); // 重置任何遗留音效
+            overlay.style.display = 'none';
+            countdownEl.style.display = 'block';
+
+            let count = 3;
+            countdownEl.innerText = count;
+            sfx.tick(); // 使用新的 tick 音效
+
+            let intv = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownEl.innerText = count;
+                    sfx.tick();
+                } else {
+                    clearInterval(intv);
+                    countdownEl.style.display = 'none';
+                    sfx.start();
+                    initBoard();
+                    score = 0;
+                    scoreEl.innerText = 0;
+                    gameOver = false;
+                    isPaused = false;
+                    isGameStarting = false;
+                    nextPieceIndex = null;
+                    newPiece();
+                    updateGame();
+                }
+            }, 1000);
+        }
+
+        /**
+         * AI & GESTURE CONTROL LOGIC (Holistic)
+         */
+        const videoEl = document.getElementById('webcamPreview');
+        const guideCanvas = document.getElementById('guideCanvas');
+        const guideCtx = guideCanvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const startProgress = document.getElementById('startProgress');
+
+        // 添加点击事件，切换滤镜
+        videoEl.addEventListener('click', () => {
+            videoEl.classList.toggle('no-filter');
+        });
+
+        let tiltState = 'neutral';
+        let rotateState = 'open';
+        let handsUpStartTime = 0;
+        const HANDS_UP_DURATION = 2500; // 调整为2.5秒
+
+        function onResults(results) {
+            guideCanvas.width = videoEl.videoWidth || 640;
+            guideCanvas.height = videoEl.videoHeight || 480;
+            guideCtx.clearRect(0, 0, guideCanvas.width, guideCanvas.height);
+
+            const pose = results.poseLandmarks;
+            const leftHand = results.leftHandLandmarks;
+            const rightHand = results.rightHandLandmarks;
+
+            if (!pose) return;
+
+            // 1. GLOBAL START/RESTART (Hands Over Head)
+            const nose = pose[0];
+            const leftWrist = pose[15];
+            const rightWrist = pose[16];
+
+            let handsUp = false;
+            if (leftWrist && rightWrist && nose) {
+                if (leftWrist.y < nose.y && rightWrist.y < nose.y) {
+                    handsUp = true;
+                }
+            }
+
+            if (handsUp && (isPaused || gameOver) && !isGameStarting) {
+                if (handsUpStartTime === 0) {
+                    handsUpStartTime = Date.now();
+                    startProgress.style.display = 'flex';
+                }
+                const elapsed = Date.now() - handsUpStartTime;
+                const progress = Math.min(elapsed / HANDS_UP_DURATION, 1.0);
+                
+                // 更新UI
+                document.getElementById('progressText').innerText = Math.floor(progress * 100) + '%';
+                startProgress.style.borderColor = `rgba(0, ${50 + progress * 200}, 0, 0.5)`;
+
+                // 播放启动引擎音效
+                if (elapsed % 100 < 20) {
+                    sfx.engineRev(progress);
+                }
+
+                if (elapsed >= HANDS_UP_DURATION) {
+                    isGameStarting = true;
+                    handsUpStartTime = 0;
+                    startProgress.style.display = 'none';
+                    startGameSequence();
+                    return;
+                }
+            } else {
+                handsUpStartTime = 0;
+                startProgress.style.display = 'none';
+            }
+
+            if (isPaused || gameOver) return;
+
+            // 2. HEAD TILT CONTROL
+            const leftEar = pose[7];
+            const rightEar = pose[8];
+
+            if (leftEar && rightEar) {
+                const earDiffY = leftEar.y - rightEar.y;
+                const TILT_THRESHOLD = 0.03;
+
+                if (earDiffY > TILT_THRESHOLD) {
+                    if (tiltState === 'neutral') {
+                        movePiece(-1);
+                        tiltState = 'tilted_left';
+                    }
+                } else if (earDiffY < -TILT_THRESHOLD) {
+                    if (tiltState === 'neutral') {
+                        movePiece(1);
+                        tiltState = 'tilted_right';
+                    }
+                } else {
+                    if (Math.abs(earDiffY) < (TILT_THRESHOLD / 2)) {
+                        tiltState = 'neutral';
+                    }
+                }
+            }
+
+            // 3. ACCELERATION & AUDIO SYNC
+            if (leftHand) {
+                const dist = Math.hypot(leftHand[8].x - leftHand[0].x, leftHand[8].y - leftHand[0].y);
+                const shouldAccelerate = (dist < 0.2);
+                
+                // 状态改变时触发音效
+                if (shouldAccelerate && !isAccelerating) {
+                    sfx.startAcceleration();
+                } else if (!shouldAccelerate && isAccelerating) {
+                    sfx.stopAcceleration();
+                }
+                
+                isAccelerating = shouldAccelerate;
+            } else {
+                if (isAccelerating) {
+                    sfx.stopAcceleration();
+                }
+                isAccelerating = false;
+            }
+
+            // 4. ROTATION
+            if (rightHand) {
+                const dist = Math.hypot(rightHand[8].x - rightHand[0].x, rightHand[8].y - rightHand[0].y);
+                if (dist < 0.2) {
+                    if (rotateState === 'open') {
+                        rotatePiece();
+                        rotateState = 'closed';
+                    }
+                } else {
+                    rotateState = 'open';
+                }
+            }
+        }
+
+        const holistic = new Holistic({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+            }
+        });
+
+        holistic.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        holistic.onResults(onResults);
+
+        startBtn.addEventListener('click', () => {
+            startBtn.innerText = "LOADING AI SYSTEM...";
+            const camera = new Camera(videoEl, {
+                onFrame: async () => {
+                    await holistic.send({ image: videoEl });
+                },
+                width: 640,
+                height: 480
+            });
+            camera.start()
+                .then(() => {
+                    startBtn.style.display = 'none';
+                    document.querySelector('#overlay p').innerText = "Raise BOTH hands to START";
+                    sfx.enable();
+                });
+        });
+
+    </script>
+</body>
+
+</html>

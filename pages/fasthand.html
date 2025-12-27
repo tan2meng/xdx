@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快手对决</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖐️</text></svg>">
+
+    <!-- 引入 MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff0055;
+            --bg: #0a0a12;
+            --box-width: 150px;
+            /* 定义图片盒子宽度变量 */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'LXGW WenKai TC', sans-serif;
+            background-color: var(--bg);
+            color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #video-layer,
+        #canvas-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #video-layer {
+            opacity: 0.3;
+            z-index: 1;
+        }
+
+        #canvas-layer {
+            z-index: 2;
+        }
+
+        #ui-layer {
+            position: absolute;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .score-display {
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        /* 目标区域修改：支持动态Gap */
+        .target-area {
+            display: flex;
+            justify-content: center;
+            /* 改为居中，配合gap控制距离 */
+            align-items: center;
+            width: 100%;
+            margin-top: 50px;
+            gap: 150px;
+            /* 默认间距 */
+            transition: gap 0.2s ease;
+            /* 平滑过渡 */
+        }
+
+        .target-box {
+            width: var(--box-width);
+            height: var(--box-width);
+            background: rgba(0, 0, 0, 0.6);
+            border: 3px solid #555;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 80px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            transition: transform 0.1s, border-color 0.1s;
+        }
+
+        .target-box.active {
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+
+        .real-style {
+            filter: drop-shadow(0px 5px 5px rgba(0, 0, 0, 0.5));
+            transform: perspective(500px) rotateX(10deg);
+        }
+
+        #time-bar-container {
+            width: 80%;
+            height: 20px;
+            background: #333;
+            margin: 0 auto;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #fff;
+            position: relative;
+            margin-bottom: 100px;
+        }
+
+        #time-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #00ff88);
+            transform-origin: left;
+        }
+
+        #menu-overlay {
+            position: absolute;
+            z-index: 20;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 18, 0.90);
+            /* 稍微降低不透明度以便观察调整 */
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: opacity 0.5s;
+        }
+
+        h1 {
+            font-size: 60px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 4px 4px 0px var(--secondary);
+            margin-bottom: 20px;
+            margin-top: 0;
+        }
+
+        .settings-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px 40px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 350px;
+        }
+
+        label {
+            font-size: 18px;
+            color: #ccc;
+            flex: 1;
+            text-align: left;
+        }
+
+        select,
+        input[type=range] {
+            flex: 1;
+            padding: 8px;
+            font-size: 16px;
+            background: #222;
+            color: white;
+            border: 1px solid var(--primary);
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        input[type=range] {
+            padding: 0;
+            height: 10px;
+            -webkit-appearance: none;
+            background: #444;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        .instruction {
+            margin-top: 30px;
+            font-size: 24px;
+            color: #fff;
+            animation: pulse 1.5s infinite;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.5;
+            }
+        }
+
+        #leaderboard {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 300px;
+            text-align: center;
+        }
+
+        #leaderboard h3 {
+            margin-top: 0;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .rank-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <!-- 摄像头画面 -->
+        <video id="video-layer" playsinline></video>
+        <!-- 骨骼绘制 -->
+        <canvas id="canvas-layer"></canvas>
+
+        <!-- 游戏界面 -->
+        <div id="ui-layer">
+            <div class="top-bar">
+                <div>快手对决</div>
+                <div class="score-display">得分: <span id="score">0</span></div>
+            </div>
+
+            <div class="target-area" id="target-area">
+                <div class="target-box" id="target-left">
+                    <span class="real-style">🖐️</span>
+                </div>
+                <div class="target-box" id="target-right">
+                    <span class="real-style">👊</span>
+                </div>
+            </div>
+
+            <div id="time-bar-container">
+                <div id="time-bar"></div>
+            </div>
+        </div>
+
+        <!-- 菜单界面 -->
+        <div id="menu-overlay">
+            <h1>快手对决</h1>
+
+            <div class="settings-container">
+                <div class="settings-group">
+                    <label for="difficulty">游戏难度:</label>
+                    <select id="difficulty">
+                        <option value="easy">简单 (1.4s)</option>
+                        <option value="medium" selected>中等 (1.2s)</option>
+                        <option value="hard">超难 (1.0s)</option>
+                    </select>
+                </div>
+
+                <div class="settings-group">
+                    <label for="mode">游戏模式:</label>
+                    <select id="mode">
+                        <!-- 这里的value改为了 visual_match 和 logical_opposite 以区分逻辑 -->
+                        <option value="visual_match" selected>匹配模式 (默认)</option>
+                        <option value="logical_opposite">相反模式</option>
+                    </select>
+                </div>
+
+                <div class="settings-group">
+                    <label for="distance">图片间距:</label>
+                    <input type="range" id="distance" min="0.5" max="6" step="0.1" value="1">
+                </div>
+                <div style="font-size: 12px; color: #888; text-align: center; margin-top: -10px; margin-bottom: 10px;">
+                    左右滑动调节间距
+                </div>
+
+                <div style="font-size: 12px; color: #888; max-width: 350px; text-align: center;">
+                    *匹配模式：屏幕左侧的图像 -> 对应你左侧的手势。<br>
+                    *相反模式：屏幕左侧的图像 -> 对应你右侧的手势。
+                </div>
+            </div>
+
+            <div class="instruction">
+                🙌 举起双手开始游戏
+            </div>
+
+            <div id="leaderboard">
+                <h3>🏆 排行榜</h3>
+                <div id="leaderboard-list">
+                    <!-- JS 填充 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 游戏配置与状态 ---
+        const config = {
+            gestures: ['palm', 'fist'], // 手掌, 拳头
+            imgMap: {
+                'palm': '🖐️',
+                'fist': '👊'
+            },
+            difficulties: {
+                'easy': 1400,   // 修改为1.4s
+                'medium': 1200, // 保持1.2s
+                'hard': 1000    // 修改为1.0s
+            },
+            boxWidth: 150 // 单张图片宽度
+        };
+
+        let state = {
+            isPlaying: false,
+            score: 0,
+            timer: 0,
+            maxTime: 1200,
+            currentTargets: { left: null, right: null },
+            lastTime: 0,
+            mode: 'visual_match',
+            isGameOver: false,
+            startHoldTime: 0,
+            handsDetected: false
+        };
+
+        // --- DOM 元素 ---
+        const videoElement = document.getElementById('video-layer');
+        const canvasElement = document.getElementById('canvas-layer');
+        const canvasCtx = canvasElement.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const timeBar = document.getElementById('time-bar');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const targetArea = document.getElementById('target-area');
+        const targetLeftEl = document.getElementById('target-left').querySelector('span');
+        const targetRightEl = document.getElementById('target-right').querySelector('span');
+        const diffSelect = document.getElementById('difficulty');
+        const modeSelect = document.getElementById('mode');
+        const distSlider = document.getElementById('distance');
+        const leaderboardList = document.getElementById('leaderboard-list');
+
+        // --- 间距调节逻辑 ---
+        function updateDistance() {
+            const multiplier = parseFloat(distSlider.value);
+            const gap = config.boxWidth * multiplier;
+            targetArea.style.gap = `${gap}px`;
+        }
+
+        // 监听滑块变化，实时更新
+        distSlider.addEventListener('input', updateDistance);
+        // 初始化间距
+        updateDistance();
+
+        // --- 音效系统 ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'match') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'gameover') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'tick') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+        }
+
+        // --- 排行榜逻辑 ---
+        function updateLeaderboard() {
+            let scores = JSON.parse(localStorage.getItem('fastHandScores') || '[]');
+            scores.sort((a, b) => b - a);
+            scores = scores.slice(0, 6);
+
+            leaderboardList.innerHTML = '';
+            if (scores.length === 0) {
+                leaderboardList.innerHTML = '<div style="color:#666">暂无记录</div>';
+            } else {
+                scores.forEach((s, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'rank-item';
+                    div.innerHTML = `<span>第${['一', '二', '三', '四', '五', '六'][index]}名</span> <span>${s}</span>`;
+                    leaderboardList.appendChild(div);
+                });
+            }
+        }
+
+        function saveScore(s) {
+            let scores = JSON.parse(localStorage.getItem('fastHandScores') || '[]');
+            scores.push(s);
+            localStorage.setItem('fastHandScores', JSON.stringify(scores));
+            updateLeaderboard();
+        }
+
+        // --- MediaPipe 初始化 ---
+        const hands = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+        });
+
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720
+        });
+        camera.start();
+
+        // --- 手势识别逻辑 ---
+        function detectGesture(landmarks) {
+            let fingersFolded = 0;
+            const tips = [8, 12, 16, 20];
+            const pips = [6, 10, 14, 18];
+
+            tips.forEach((tipIdx, i) => {
+                const tip = landmarks[tipIdx];
+                const pip = landmarks[pips[i]];
+                const wrist = landmarks[0];
+                const distTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                const distPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+                if (distTip < distPip) fingersFolded++;
+            });
+
+            return fingersFolded >= 3 ? 'fist' : 'palm';
+        }
+
+        // --- 游戏循环 ---
+        function startGame() {
+            state.mode = modeSelect.value;
+            state.maxTime = config.difficulties[diffSelect.value];
+
+            state.score = 0;
+            state.isPlaying = true;
+            state.isGameOver = false;
+            scoreEl.innerText = state.score;
+
+            menuOverlay.classList.add('hidden');
+            playSound('tick');
+
+            nextRound();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            state.isPlaying = false;
+            state.isGameOver = true;
+            playSound('gameover');
+            saveScore(state.score);
+            menuOverlay.classList.remove('hidden');
+        }
+
+        function nextRound() {
+            const g1 = config.gestures[Math.floor(Math.random() * 2)];
+            const g2 = config.gestures[Math.floor(Math.random() * 2)];
+
+            state.currentTargets.left = g1;
+            state.currentTargets.right = g2;
+
+            targetLeftEl.innerText = config.imgMap[g1];
+            targetRightEl.innerText = config.imgMap[g2];
+
+            state.timer = state.maxTime;
+            state.lastTime = performance.now();
+        }
+
+        function gameLoop(timestamp) {
+            if (!state.isPlaying) return;
+
+            const delta = timestamp - state.lastTime;
+            state.lastTime = timestamp;
+            state.timer -= delta;
+
+            const pct = Math.max(0, (state.timer / state.maxTime) * 100);
+            timeBar.style.width = `${pct}%`;
+
+            if (pct < 30) timeBar.style.background = '#ff0055';
+            else timeBar.style.background = 'linear-gradient(90deg, var(--primary), #00ff88)';
+
+            if (state.timer <= 0) {
+                gameOver();
+            } else {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // --- 核心处理函数 ---
+        function onResults(results) {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            let leftHandGesture = null; // 视觉上在屏幕左边的手
+            let rightHandGesture = null; // 视觉上在屏幕右边的手
+            let handsHigh = 0;
+
+            if (results.multiHandLandmarks) {
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const landmarks = results.multiHandLandmarks[i];
+
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00f3ff', lineWidth: 2 });
+                    drawLandmarks(canvasCtx, landmarks, { color: '#ffffff', lineWidth: 1, radius: 3 });
+
+                    const gesture = detectGesture(landmarks);
+
+                    // 镜像后：x > 0.5 是屏幕左边，x < 0.5 是屏幕右边 (canvas scaleX(-1))
+                    // 但是在数据层，MediaPipe输出的是标准化坐标，0是左，1是右。
+                    // 我们的CSS做了镜像，所以原本在左(x<0.5)的东西显示在右边。
+                    // 玩家举起右手 -> 摄像头看到在画面左边(x<0.5) -> 镜像后显示在屏幕右边。
+                    // 玩家举起左手 -> 摄像头看到在画面右边(x>0.5) -> 镜像后显示在屏幕左边。
+
+                    const wristX = landmarks[0].x;
+                    const wristY = landmarks[0].y;
+
+                    if (wristY < 0.4) handsHigh++;
+
+                    if (wristX > 0.5) {
+                        // 原始数据右侧 -> 翻转后屏幕左侧 (Visual Left)
+                        leftHandGesture = gesture;
+                    } else {
+                        // 原始数据左侧 -> 翻转后屏幕右侧 (Visual Right)
+                        rightHandGesture = gesture;
+                    }
+                }
+            }
+            canvasCtx.restore();
+
+            if (!state.isPlaying) {
+                if (handsHigh >= 2) {
+                    if (state.startHoldTime === 0) state.startHoldTime = Date.now();
+                    if (Date.now() - state.startHoldTime > 1000) {
+                        state.startHoldTime = 0;
+                        startGame();
+                    }
+                    document.querySelector('.instruction').style.color = '#00f3ff';
+                    document.querySelector('.instruction').innerText = `保持住... ${(1 - (Date.now() - state.startHoldTime) / 1000).toFixed(1)}`;
+                } else {
+                    state.startHoldTime = 0;
+                    document.querySelector('.instruction').style.color = '#fff';
+                    document.querySelector('.instruction').innerText = "🙌 举起双手开始游戏";
+                }
+                return;
+            }
+
+            // --- 判定逻辑 ---
+            // visual_match (旧的Opposite, 现在的默认): 屏幕左图 -> 匹配 屏幕左手
+            // logical_opposite (旧的Match): 屏幕左图 -> 匹配 屏幕右手
+
+            let matchLeft = false;
+            let matchRight = false;
+
+            if (state.mode === 'visual_match') {
+                // 视觉匹配模式：所见即所得
+                if (leftHandGesture === state.currentTargets.left) matchLeft = true;
+                if (rightHandGesture === state.currentTargets.right) matchRight = true;
+            } else {
+                // 交叉模式/相反模式：左图对右手
+                if (rightHandGesture === state.currentTargets.left) matchLeft = true;
+                if (leftHandGesture === state.currentTargets.right) matchRight = true;
+            }
+
+            const boxLeft = document.getElementById('target-left');
+            const boxRight = document.getElementById('target-right');
+
+            if (matchLeft) boxLeft.style.borderColor = '#00f3ff';
+            else boxLeft.style.borderColor = '#555';
+
+            if (matchRight) boxRight.style.borderColor = '#00f3ff';
+            else boxRight.style.borderColor = '#555';
+
+            if (matchLeft && matchRight) {
+                state.score++;
+                scoreEl.innerText = state.score;
+                playSound('match');
+                nextRound();
+            }
+        }
+
+        updateLeaderboard();
+        updateDistance(); // 初始化调用一次
+
+    </script>
+</body>
+
+</html>

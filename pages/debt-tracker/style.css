@@ -1,0 +1,536 @@
+:root {
+    --trump-gold: #D4AF37;
+    --trump-red: #E0162B;
+    --trump-blue: #0052A5;
+    --trump-bg: #FFFFFF;
+    --text-color: #333;
+    --text-loud: #000;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'LXGW WenKai TC';
+    background: linear-gradient(135deg, var(--trump-blue) 0%, #003366 100%);
+    color: var(--text-color);
+    min-height: 100vh;
+    padding: 20px;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.app-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding-bottom: 50px;
+}
+
+/* --- Header --- */
+.main-header {
+    background: white;
+    padding: 20px;
+    border: 5px solid var(--trump-gold);
+    box-shadow: 0 10px 0 var(--trump-red);
+    margin-bottom: 40px;
+    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.main-header h1 {
+    font-family: 'LXGW WenKai TC';
+    font-size: 3rem;
+    text-transform: uppercase;
+    color: var(--trump-blue);
+    text-shadow: 2px 2px 0 var(--trump-gold);
+}
+
+.income-setting {
+    background: var(--trump-gold);
+    padding: 10px;
+    border: 2px solid black;
+    font-weight: bold;
+}
+
+.income-setting label {
+    color: var(--trump-blue);
+    margin-right: 5px;
+}
+
+.income-setting input {
+    border: 2px solid var(--trump-blue);
+    padding: 5px;
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.2rem;
+}
+
+/* --- Dashboard Stats --- */
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat-card {
+    background: white;
+    border: 4px solid var(--trump-gold);
+    padding: 10px;
+    text-align: center;
+    box-shadow: 5px 5px 0 var(--trump-blue);
+}
+
+.stat-card h3 {
+    font-family: 'LXGW WenKai TC';
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--trump-blue);
+    border-bottom: 2px solid var(--trump-gold);
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+}
+
+.stat-card .value {
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.8rem;
+    color: var(--trump-red);
+}
+
+.stat-card.remaining .value {
+    font-size: 2.2rem;
+    color: var(--trump-red);
+    text-decoration: underline;
+}
+
+.stat-card.paid .value {
+    color: green;
+}
+
+/* --- Freedom Wall --- */
+.freedom-meter {
+    background: white;
+    border: 5px solid var(--trump-gold);
+    padding: 20px;
+    margin-bottom: 40px;
+    box-shadow: 10px 10px 0 black;
+    text-align: center;
+}
+
+.meter-header h2 {
+    font-family: 'LXGW WenKai TC';
+    font-size: 2rem;
+    color: var(--trump-blue);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.freedom-time {
+    display: block;
+    font-family: 'LXGW WenKai TC';
+    font-size: 3rem;
+    color: var(--trump-gold);
+    text-shadow: 2px 2px 0 black;
+    margin-bottom: 10px;
+}
+
+.progress-bar-bg {
+    height: 30px;
+    background: #ccc;
+    border: 2px solid black;
+    margin-bottom: 15px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: repeating-linear-gradient(45deg,
+            var(--trump-blue),
+            var(--trump-blue) 10px,
+            var(--trump-red) 10px,
+            var(--trump-red) 20px);
+}
+
+.quote {
+    font-weight: bold;
+    font-style: italic;
+    color: var(--trump-blue);
+    font-size: 1.2rem;
+}
+
+/* --- Platforms --- */
+.controls-bar {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.controls-bar h2 {
+    color: white;
+    font-family: 'LXGW WenKai TC';
+    font-size: 2rem;
+    text-shadow: 2px 2px 0 black;
+    margin-bottom: 10px;
+}
+
+.btn-primary {
+    background: var(--trump-red);
+    color: white;
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.2rem;
+    padding: 10px 30px;
+    border: 3px solid white;
+    box-shadow: 4px 4px 0 black;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.btn-primary:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 black;
+}
+
+.platforms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+}
+
+.platform-card {
+    background: #fff8e1;
+    /* Light gold tint */
+    border: 4px solid var(--trump-gold);
+    padding: 20px;
+    position: relative;
+    box-shadow: 8px 8px 0 var(--trump-blue);
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.platform-card:hover {
+    transform: scale(1.02);
+}
+
+.card-overdue {
+    border-color: var(--trump-red);
+    background: #ffebeb;
+}
+
+.card-badge-overdue {
+    background: var(--trump-red);
+    color: white;
+    text-align: center;
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.2rem;
+    padding: 5px;
+    margin: -20px -20px 10px -20px;
+    border-bottom: 4px solid var(--trump-gold);
+}
+
+.platform-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.platform-icon {
+    font-size: 2.5rem;
+    background: white;
+    border: 2px solid black;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.platform-info h4 {
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.5rem;
+    color: var(--trump-blue);
+    text-transform: uppercase;
+}
+
+.platform-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    background: white;
+    padding: 10px;
+    border: 2px solid black;
+}
+
+.p-stat .label {
+    display: block;
+    font-weight: bold;
+    font-size: 0.7rem;
+    color: #666;
+    letter-spacing: 1px;
+}
+
+.p-stat .val {
+    font-family: 'LXGW WenKai TC';
+    font-weight: 900;
+    font-size: 1.1rem;
+}
+
+.p-stat .val.danger {
+    color: var(--trump-red);
+}
+
+.p-stat .val.warning {
+    color: orange;
+}
+
+.p-stat .val.success {
+    color: green;
+}
+
+.delete-platform-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: red;
+    color: white;
+    border: 2px solid black;
+    font-weight: bold;
+    width: 25px;
+    height: 25px;
+    line-height: 20px;
+    cursor: pointer;
+}
+
+
+
+/* --- Modals --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.modal {
+    background: white;
+    border: 8px solid var(--trump-gold);
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 0 50px var(--trump-gold);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 2px solid black;
+    padding-bottom: 10px;
+}
+
+.modal-header h3 {
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.5rem;
+    color: var(--trump-blue);
+}
+
+.close-btn {
+    background: var(--trump-red);
+    color: white;
+    border: none;
+    font-size: 1.5rem;
+    padding: 0 10px;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: var(--trump-blue);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 2px solid var(--trump-blue);
+    font-family: 'LXGW WenKai TC';
+    font-size: 1.1rem;
+}
+
+.emoji-picker {
+    display: flex;
+    gap: 5px;
+}
+
+.emoji-opt {
+    font-size: 1.5rem;
+    padding: 5px;
+    border: 2px solid transparent;
+    cursor: pointer;
+}
+
+.emoji-opt:hover {
+    background: #eee;
+}
+
+.emoji-opt.selected {
+    border: 2px solid var(--trump-gold);
+    background: #fff8e1;
+}
+
+.btn-secondary {
+    background: var(--trump-blue);
+    color: white;
+    border: 3px solid white;
+    box-shadow: 4px 4px 0 black;
+    padding: 10px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: 'LXGW WenKai TC';
+    text-transform: uppercase;
+    font-size: 1.1rem;
+}
+
+.modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.loan-item {
+    border: 2px solid black;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #fdfdfd;
+    display: block;
+    width: 100%;
+}
+
+.loan-item.paid {
+    background: #e6fffa;
+    border-color: green;
+}
+
+.loan-item.overdue {
+    background: #fff5f5;
+    border-color: red;
+}
+
+.status-badge {
+    padding: 2px 5px;
+    font-weight: bold;
+    border: 1px solid black;
+    text-transform: uppercase;
+}
+
+.status-badge.active {
+    background: white;
+}
+
+.status-badge.paid {
+    background: #48bb78;
+    color: white;
+}
+
+.status-badge.overdue {
+    background: #f56565;
+    color: white;
+}
+
+.loan-actions button {
+    display: none;
+    /* Moved to inline */
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    margin-left: 5px;
+    padding: 2px;
+    transition: transform 0.2s;
+}
+
+.icon-btn:hover {
+    transform: scale(1.3);
+}
+
+.loans-list-section {
+    margin-top: 30px;
+    padding-top: 10px;
+    display: block;
+    width: 100%;
+}
+
+.loans-list-section h4 {
+    font-family: 'LXGW WenKai TC';
+    color: var(--trump-blue);
+    margin-bottom: 15px;
+    display: block;
+}
+
+.loans-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: block;
+    width: 100%;
+    min-height: 50px;
+}
+
+
+.divider {
+    border: 0;
+    border-top: 2px solid var(--trump-gold);
+    margin: 30px 0;
+}
+
+
+/* --- Media Queries --- */
+@media (max-width: 600px) {
+    .main-header {
+        flex-direction: column;
+        gap: 15px;
+        padding: 10px;
+    }
+
+    .main-header h1 {
+        font-size: 2rem;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .dashboard-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .platforms-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal {
+        width: 95%;
+        padding: 15px;
+    }
+}

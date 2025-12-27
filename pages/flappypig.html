@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <title>水墨飞猪 - 意境版</title>
+    <!-- 设置 Favicon 为水墨点 -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22black%22/></svg>">
+
+    <!-- 引入 Ma Shan Zheng 字体 (书法风格) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+
+    <style>
+        /* 水墨风格全局样式 */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'LXGW WenKai TC', cursive;
+            user-select: none;
+            background-color: #F4F4F4;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #F4F4F4;
+            /* 宣纸白 */
+        }
+
+        /* 摄像头预览 - 黑白滤镜 + 墨迹边框 */
+        #video-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border: 4px solid #333;
+            border-radius: 15px;
+            overflow: hidden;
+            z-index: 10;
+            background: #000;
+            transform: scaleX(-1);
+            filter: grayscale(100%) contrast(1.2);
+            box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.2);
+        }
+
+        #input_video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 左上角：难度设置 */
+        #settings-wrapper {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 15px;
+            border: 2px solid #333;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+            transition: width 0.3s ease;
+            overflow: hidden;
+            width: 40px;
+            white-space: nowrap;
+        }
+
+        #settings-wrapper:hover {
+            width: 300px;
+        }
+
+        #settings-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            cursor: pointer;
+            padding-left: 5px;
+            color: #333;
+        }
+
+        #difficulty-controls {
+            display: flex;
+            flex-direction: column;
+            width: 220px;
+            opacity: 0;
+            transition: opacity 0.3s 0.1s;
+        }
+
+        #settings-wrapper:hover #difficulty-controls {
+            opacity: 1;
+        }
+
+        /* 自定义滑块样式 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #333;
+            margin-top: -6px;
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #ccc;
+        }
+
+        .diff-label {
+            font-size: 18px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        /* 右上角：排行榜 */
+        #leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 15px;
+            border: 3px solid #333;
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.1);
+            min-width: 180px;
+            font-family: 'LXGW WenKai TC', cursive;
+        }
+
+        #leaderboard h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 5px;
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+
+        #leaderboard ol {
+            padding-left: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        #leaderboard li {
+            margin-bottom: 8px;
+            font-size: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #555;
+        }
+
+        .rank-name {
+            color: #333;
+            margin-right: 10px;
+        }
+
+        .rank-score {
+            color: #B22222;
+            font-weight: bold;
+        }
+
+        /* 类似印章红 */
+
+        /* UI 层 */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        h1 {
+            position: absolute;
+            top: 15%;
+            width: 100%;
+            text-align: center;
+            font-size: 100px;
+            color: #333;
+            text-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+            margin: 0;
+            letter-spacing: 10px;
+        }
+
+        /* 最终分数 */
+        #final-score-container {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 6;
+            text-align: center;
+            display: none;
+            pointer-events: none;
+            width: 100%;
+        }
+
+        #final-score-title {
+            font-size: 36px;
+            color: #333;
+            margin: 0;
+            margin-bottom: 5px;
+        }
+
+        #final-score-val {
+            font-size: 120px;
+            color: #B22222;
+            text-shadow: 2px 2px 0 #fff;
+            margin: 0;
+            line-height: 1;
+        }
+
+        /* 提示框 */
+        .info-box {
+            position: absolute;
+            top: 70%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 40px;
+            border: 3px solid #333;
+            border-radius: 15px;
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
+            transition: all 0.4s ease;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .info-box.charging {
+            top: 50%;
+            transform: translate(-50%, -50%) scale(1.5);
+            border-width: 5px;
+            z-index: 100;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
+        }
+
+        p {
+            font-size: 28px;
+            color: #333;
+            margin: 5px 0;
+        }
+
+        #percent-display {
+            font-size: 40px;
+            display: inline-block;
+            min-width: 90px;
+            font-family: 'LXGW WenKai TC', sans-serif;
+            /* 数字用简单字体 */
+            font-weight: bold;
+        }
+
+        /* 实时分数 */
+        #score-board {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 80px;
+            color: #333;
+            z-index: 4;
+            display: none;
+            font-family: 'LXGW WenKai TC', cursive;
+        }
+    </style>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.1/build/three.module.js"
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <!-- 难度设置 -->
+        <div id="settings-wrapper">
+            <div id="settings-icon">⚙️</div>
+            <div id="difficulty-controls">
+                <div style="font-size:18px; color:#333; margin-bottom:5px;">难度调整</div>
+                <input type="range" id="diff-slider" min="0" max="100" value="50">
+                <div class="diff-label">
+                    <span>闲适</span>
+                    <span id="diff-val-text">常态</span>
+                    <span>极境</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 排行榜 -->
+        <div id="leaderboard">
+            <h3>英雄榜</h3>
+            <ol id="leaderboard-list">
+                <!-- JS生成 -->
+            </ol>
+        </div>
+
+        <div id="score-board">0</div>
+
+        <!-- UI 面板层 -->
+        <div id="ui-layer">
+            <h1 id="game-title">水墨飞猪</h1>
+            <div id="final-score-container">
+                <h2 id="final-score-title">最终战绩</h2>
+                <div id="final-score-val">0</div>
+            </div>
+            <div id="info-panel" class="info-box">
+                <p id="status-text">研墨中...</p>
+                <p id="instruction-text" style="font-size: 22px; color: #666; margin-top:10px;">请授予摄像头权限以操控</p>
+            </div>
+        </div>
+
+        <div id="video-container">
+            <video id="input_video"></video>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ==========================================
+        // 0. 音频系统 (古风)
+        // ==========================================
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // 通用发声函数，模拟木鱼/古琴/锣
+        function playSound(type, freq, duration, decay = true, vol = 0.1) {
+            initAudio();
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.type = type; // sine, square, triangle
+            const now = audioCtx.currentTime;
+
+            osc.frequency.setValueAtTime(freq, now);
+            if (decay) {
+                // 快速衰减模拟敲击
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            } else {
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.linearRampToValueAtTime(0, now + duration);
+            }
+
+            osc.start();
+            osc.stop(now + duration);
+        }
+
+        function playStartSound() {
+            // 类似于古琴滑音
+            playSound('triangle', 330, 0.5, true, 0.2);
+            setTimeout(() => playSound('triangle', 440, 0.5, true, 0.2), 100);
+            setTimeout(() => playSound('triangle', 550, 0.8, true, 0.15), 200);
+        }
+        function playJumpSound() {
+            // 木鱼/竹板声
+            playSound('sine', 200, 0.1, true, 0.3);
+        }
+        function playScoreSound() {
+            // 清脆铃声
+            playSound('sine', 880, 0.3, true, 0.05);
+        }
+        function playGameOverSound() {
+            // 锣声/低沉
+            playSound('sawtooth', 100, 1.5, true, 0.2);
+        }
+
+        // ==========================================
+        // 1. 排行榜逻辑 (保持不变)
+        // ==========================================
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const leaderboardContainer = document.getElementById('leaderboard');
+        const RANK_NAMES = ["状元", "榜眼", "探花", "进士", "举人"];
+
+        function getScores() {
+            const stored = localStorage.getItem('piggy_leaderboard_ink');
+            return stored ? JSON.parse(stored) : [];
+        }
+
+        function saveScore(newScore) {
+            if (newScore === 0) return;
+            let scores = getScores();
+            scores.push(newScore);
+            scores.sort((a, b) => b - a);
+            scores = scores.slice(0, 5);
+            localStorage.setItem('piggy_leaderboard_ink', JSON.stringify(scores));
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            const scores = getScores();
+            leaderboardList.innerHTML = '';
+            if (scores.length === 0) {
+                leaderboardList.innerHTML = '<li style="justify-content:center; color:#999;">虚位以待</li>';
+                return;
+            }
+            scores.forEach((s, index) => {
+                const li = document.createElement('li');
+                const rankName = RANK_NAMES[index] || `第${index + 1}名`;
+                li.innerHTML = `<span class="rank-name">${rankName}</span><span class="rank-score">${s}</span>`;
+                leaderboardList.appendChild(li);
+            });
+        }
+        renderLeaderboard();
+
+        // ==========================================
+        // 2. 全局状态
+        // ==========================================
+        const CONFIG = {
+            gravity: 25, jumpForce: 10, pipeSpawnRate: 2.2, pipeSpeed: 8, gapSize: 7
+        };
+
+        const slider = document.getElementById('diff-slider');
+        const diffText = document.getElementById('diff-val-text');
+
+        function updateDifficulty(val) {
+            CONFIG.pipeSpeed = 6 + (val / 100) * 8;
+            CONFIG.gapSize = 9 - (val / 100) * 4;
+            CONFIG.pipeSpawnRate = 3.0 - (val / 100) * 1.8;
+            if (val < 30) diffText.innerText = "闲适";
+            else if (val < 70) diffText.innerText = "常态";
+            else diffText.innerText = "极境";
+            initAudio();
+        }
+        slider.addEventListener('input', (e) => { updateDifficulty(e.target.value); e.target.blur(); });
+
+        let scene, camera, renderer;
+        let pigGroup, pipes = [], clouds = []; // 使用云朵代替 environmentItems
+        let inkParticles = []; // 墨迹粒子
+        let score = 0;
+        let gameState = 'LOADING';
+        let isDetectionActive = true;
+        let lastTime = 0;
+        let timeSinceLastPipe = 0;
+        let birdVelocityY = 0;
+        let hoverTime = 0;
+
+        const uiTitle = document.getElementById('game-title');
+        const uiPanel = document.getElementById('info-panel');
+        const statusText = document.getElementById('status-text');
+        const instructionText = document.getElementById('instruction-text');
+        const scoreEl = document.getElementById('score-board');
+        const finalScoreContainer = document.getElementById('final-score-container');
+        const finalScoreVal = document.getElementById('final-score-val');
+        const settingsWrapper = document.getElementById('settings-wrapper');
+
+        // ==========================================
+        // 3. MediaPipe & 手势 (保持不变)
+        // ==========================================
+        const videoElement = document.getElementById('input_video');
+        let armState = 'down';
+        let handsUpDuration = 0;
+
+        function getArmAngle(shoulder, wrist) {
+            const dx = wrist.x - shoulder.x;
+            const dy = wrist.y - shoulder.y;
+            const mag = Math.sqrt(dx * dx + dy * dy);
+            if (mag === 0) return 0;
+            const cosTheta = -dy / mag;
+            return Math.acos(cosTheta) * (180 / Math.PI);
+        }
+
+        function updateLoadingUI(percent) {
+            uiTitle.style.display = 'none';
+            finalScoreContainer.style.display = 'none';
+            uiPanel.classList.add('charging');
+            let color = '#333';
+            statusText.innerHTML = `蓄力中... <span id="percent-display" style="color:${color}">${percent}%</span>`;
+            instructionText.innerText = "";
+        }
+
+        function resetReadyUI() {
+            uiPanel.classList.remove('charging');
+            instructionText.innerText = "";
+            uiTitle.style.display = 'block';
+            if (gameState === 'READY') {
+                finalScoreContainer.style.display = 'none';
+                statusText.innerText = "举手 启程";
+                instructionText.innerText = "双手举过头顶以激活";
+            } else if (gameState === 'GAMEOVER') {
+                finalScoreContainer.style.display = 'block';
+                statusText.innerText = "举手 重整旗鼓";
+            }
+        }
+
+        function onPoseResults(results) {
+            if (!isDetectionActive) return;
+            if (!results.poseLandmarks) return;
+
+            const lm = results.poseLandmarks;
+            const leftShoulder = lm[11];
+            const rightShoulder = lm[12];
+            const leftWrist = lm[15];
+            const rightWrist = lm[16];
+            const nose = lm[0];
+
+            const isHandsOverHead = (leftWrist.y < nose.y) && (rightWrist.y < nose.y);
+
+            if (gameState === 'READY' || gameState === 'GAMEOVER') {
+                if (isHandsOverHead) {
+                    handsUpDuration++;
+                    const percent = Math.min(100, Math.floor(handsUpDuration / 30 * 100));
+                    updateLoadingUI(percent);
+                    if (handsUpDuration > 30) {
+                        playStartSound();
+                        startGame();
+                    }
+                } else {
+                    if (handsUpDuration > 0) {
+                        handsUpDuration = 0;
+                        resetReadyUI();
+                    }
+                }
+            }
+            else if (gameState === 'PLAYING') {
+                const leftAngle = getArmAngle(leftShoulder, leftWrist);
+                const rightAngle = getArmAngle(rightShoulder, rightWrist);
+                const isUp = leftAngle < 80 && rightAngle < 80;
+                const isDown = leftAngle > 100 && rightAngle > 100;
+
+                if (isUp) {
+                    armState = 'up';
+                } else if (isDown) {
+                    if (armState === 'up') {
+                        triggerJump();
+                        armState = 'down';
+                    }
+                }
+            }
+        }
+
+        const pose = new Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults(onPoseResults);
+
+        const cameraFeed = new Camera(videoElement, {
+            onFrame: async () => { await pose.send({ image: videoElement }); },
+            width: 320, height: 240
+        });
+
+        cameraFeed.start().then(() => {
+            gameState = 'READY';
+            resetReadyUI();
+        });
+
+        // ==========================================
+        // 4. Three.js 场景 - 水墨风格
+        // ==========================================
+
+        // 辅助函数：创建带轮廓的对象
+        function createInkObject(geometry, color = 0xffffff, outlineColor = 0x000000) {
+            const group = new THREE.Group();
+
+            // 实体部分 (使用 Toon 或 Basic 材质保持扁平感)
+            const material = new THREE.MeshToonMaterial({
+                color: color,
+                gradientMap: null // 默认
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+
+            // 轮廓部分
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: outlineColor, linewidth: 2 }));
+            group.add(line);
+
+            return group;
+        }
+
+        function initThree() {
+            const container = document.getElementById('game-container');
+
+            scene = new THREE.Scene();
+            // 背景雾：米白色，增加深度感
+            scene.fog = new THREE.Fog(0xF4F4F4, 20, 80);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 150);
+            camera.position.set(0, 0, 18); // 侧视图
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            // 开启阴影
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 灯光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight.position.set(20, 30, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            createClouds(); // 创建背景云
+            createPig();    // 创建猪
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            requestAnimationFrame(animate);
+        }
+
+        function createPig() {
+            pigGroup = new THREE.Group();
+
+            // 身体：黑色球体，代表墨点
+            const bodyGeo = new THREE.SphereGeometry(1.2, 16, 16);
+            const bodyMat = new THREE.MeshToonMaterial({ color: 0x333333 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.scale.set(1, 0.8, 1);
+            pigGroup.add(body);
+
+            // 翅膀：白色带黑边
+            const wingGeo = new THREE.BoxGeometry(1.2, 0.1, 0.8);
+            const wingL = createInkObject(wingGeo, 0xffffff, 0x000000);
+            wingL.position.set(-0.2, 0.4, 0.8);
+            wingL.rotation.z = 0.2;
+
+            const wingR = createInkObject(wingGeo, 0xffffff, 0x000000);
+            wingR.position.set(-0.2, 0.4, -0.8);
+            wingR.rotation.z = 0.2;
+
+            pigGroup.add(wingL);
+            pigGroup.add(wingR);
+            pigGroup.userData = { wingL, wingR };
+
+            // 眼睛：小白点
+            const eyeGeo = new THREE.SphereGeometry(0.2, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(0.6, 0.2, 0.4);
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeR.position.set(0.6, 0.2, -0.4);
+            pigGroup.add(eyeL);
+            pigGroup.add(eyeR);
+
+            scene.add(pigGroup);
+            resetPig();
+        }
+
+        // 背景云朵
+        function createCloud(x, y, z, scale) {
+            const group = new THREE.Group();
+            const geo = new THREE.DodecahedronGeometry(1.0, 0); // 低多边形球
+            const mat = new THREE.MeshBasicMaterial({ color: 0xeeeeee }); // 浅灰云
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.5 }); // 浅淡边缘
+
+            const parts = [
+                { pos: [0, 0, 0], s: 1 },
+                { pos: [0.8, 0.2, 0], s: 0.7 },
+                { pos: [-0.8, -0.1, 0], s: 0.8 },
+                { pos: [0.4, 0.8, 0], s: 0.6 }
+            ];
+
+            parts.forEach(p => {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(...p.pos);
+                mesh.scale.setScalar(p.s);
+                group.add(mesh);
+
+                const edges = new THREE.EdgesGeometry(geo);
+                const line = new THREE.LineSegments(edges, edgeMat);
+                line.position.set(...p.pos);
+                line.scale.setScalar(p.s);
+                group.add(line);
+            });
+
+            group.position.set(x, y, z);
+            group.scale.setScalar(scale);
+            group.userData = { speed: (Math.random() * 0.5 + 0.1) };
+            return group;
+        }
+
+        function createClouds() {
+            // 初始生成一批云
+            for (let i = 0; i < 15; i++) {
+                const x = (Math.random() - 0.5) * 80;
+                const y = (Math.random() - 0.5) * 20;
+                const z = -10 - Math.random() * 30; // 远景
+                const scale = 2 + Math.random() * 3;
+                const c = createCloud(x, y, z, scale);
+                scene.add(c);
+                clouds.push(c);
+            }
+        }
+
+        function spawnInkParticle(pos) {
+            // 简单的方块粒子，模拟墨滴
+            const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(pos);
+            // 随机微小偏移
+            mesh.position.x -= 0.5;
+            mesh.position.y += (Math.random() - 0.5) * 0.5;
+
+            scene.add(mesh);
+            inkParticles.push({ mesh, life: 1.0 });
+        }
+
+        function createPipe() {
+            const gapY = (Math.random() * 8) - 4;
+            // 管道更细，像竹竿
+            const pipeRadius = 1.0;
+            const pipeGeo = new THREE.CylinderGeometry(pipeRadius, pipeRadius, 30, 16);
+
+            // 墨竹风格：白色身，黑色节
+            const pipeMat = new THREE.MeshToonMaterial({ color: 0xffffff });
+            const outlineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+            const makePipePart = (yPos) => {
+                const group = new THREE.Group();
+
+                // 主体
+                const p = new THREE.Mesh(pipeGeo, pipeMat);
+                p.position.y = yPos;
+                p.castShadow = true;
+                group.add(p);
+
+                // 轮廓
+                const edges = new THREE.EdgesGeometry(pipeGeo);
+                const line = new THREE.LineSegments(edges, outlineMat);
+                line.position.y = yPos;
+                group.add(line);
+
+                // 竹节 (环)
+                for (let i = -12; i <= 12; i += 4) {
+                    const ringGeo = new THREE.TorusGeometry(pipeRadius, 0.1, 4, 16);
+                    const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x000000 }));
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.y = yPos + i;
+                    group.add(ring);
+                }
+
+                return group;
+            }
+
+            const topPart = makePipePart(gapY + (CONFIG.gapSize / 2) + 15);
+            const bottomPart = makePipePart(gapY - (CONFIG.gapSize / 2) - 15);
+
+            const pipeGroup = new THREE.Group();
+            pipeGroup.add(topPart);
+            pipeGroup.add(bottomPart);
+
+            // 添加物理判定盒辅助
+            pipeGroup.userData = {
+                passed: false,
+                topY: gapY + (CONFIG.gapSize / 2),
+                bottomY: gapY - (CONFIG.gapSize / 2)
+            };
+
+            pipeGroup.position.set(30, 0, 0);
+            scene.add(pipeGroup);
+            pipes.push(pipeGroup);
+        }
+
+        // ==========================================
+        // 5. 游戏逻辑
+        // ==========================================
+        function resetPig() {
+            pigGroup.position.set(-4, 0, 0);
+            pigGroup.rotation.set(0, 0, 0);
+            birdVelocityY = 0; hoverTime = 0;
+            // 清空粒子
+            inkParticles.forEach(p => scene.remove(p.mesh));
+            inkParticles = [];
+        }
+
+        function triggerJump() {
+            if (gameState === 'PLAYING') {
+                birdVelocityY = CONFIG.jumpForce;
+                playJumpSound();
+                // 跳跃时喷墨
+                for (let i = 0; i < 3; i++) spawnInkParticle(pigGroup.position);
+            }
+        }
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            scoreEl.innerText = score;
+            scoreEl.style.display = 'block';
+
+            uiPanel.style.display = 'none';
+            uiTitle.style.display = 'none';
+            finalScoreContainer.style.display = 'none';
+            settingsWrapper.style.display = 'none';
+            leaderboardContainer.style.display = 'none';
+            uiPanel.classList.remove('charging');
+
+            pipes.forEach(p => scene.remove(p));
+            pipes = [];
+            resetPig();
+            lastTime = performance.now();
+            timeSinceLastPipe = CONFIG.pipeSpawnRate;
+        }
+
+        function checkCollision(pipeGroup) {
+            // 简单包围盒检测
+            // 猪大概是半径1.2的球
+            const pigInfo = new THREE.Box3().setFromObject(pigGroup);
+            // 稍微缩小判定范围，宽容度
+            pigInfo.expandByScalar(-0.5);
+
+            const topBox = new THREE.Box3().setFromObject(pipeGroup.children[0]);
+            const bottomBox = new THREE.Box3().setFromObject(pipeGroup.children[1]);
+
+            return pigInfo.intersectsBox(topBox) || pigInfo.intersectsBox(bottomBox);
+        }
+
+        function gameOver() {
+            playGameOverSound();
+            gameState = 'DYING';
+            isDetectionActive = false;
+            scoreEl.style.display = 'none';
+            finalScoreVal.innerText = score;
+            saveScore(score);
+
+            uiTitle.style.display = 'block';
+            finalScoreContainer.style.display = 'block';
+
+            setTimeout(() => {
+                gameState = 'GAMEOVER';
+                uiPanel.style.display = 'block';
+                statusText.innerText = "举手 重整旗鼓";
+                instructionText.innerText = "";
+                settingsWrapper.style.display = 'flex';
+                leaderboardContainer.style.display = 'block';
+                uiPanel.classList.remove('charging');
+                isDetectionActive = true;
+            }, 500);
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            const dt = Math.min((time - lastTime) / 1000, 0.1);
+            lastTime = time;
+
+            // 1. 云朵移动 (背景视差)
+            const cloudSpeed = (gameState === 'PLAYING') ? CONFIG.pipeSpeed * 0.2 : 0.5;
+            clouds.forEach(c => {
+                c.position.x -= cloudSpeed * c.userData.speed * dt * 10;
+                if (c.position.x < -40) {
+                    c.position.x = 40 + Math.random() * 10;
+                    c.position.y = (Math.random() - 0.5) * 20;
+                }
+            });
+
+            // 2. 猪的待机动作
+            if (gameState === 'READY' || gameState === 'GAMEOVER' || gameState === 'DYING') {
+                hoverTime += dt * 3;
+                pigGroup.position.y = Math.sin(hoverTime) * 0.5;
+                pigGroup.rotation.z = 0;
+            }
+
+            // 3. 游戏物理
+            if (gameState === 'PLAYING') {
+                birdVelocityY -= CONFIG.gravity * dt;
+                pigGroup.position.y += birdVelocityY * dt;
+                const targetRot = Math.min(Math.PI / 5, Math.max(-Math.PI / 4, (birdVelocityY * 0.12)));
+                pigGroup.rotation.z = targetRot;
+
+                // 翅膀扇动
+                const wingSpeed = birdVelocityY > 0 ? 25 : 10;
+                const wAngle = Math.abs(Math.sin(time * 0.01 * wingSpeed)) * 0.6;
+                pigGroup.userData.wingL.rotation.z = wAngle;
+                pigGroup.userData.wingR.rotation.z = -wAngle;
+
+                // 产生墨迹
+                if (Math.random() < 0.1) spawnInkParticle(pigGroup.position);
+
+                // 边界死亡
+                if (pigGroup.position.y < -11 || pigGroup.position.y > 11) gameOver();
+
+                // 生成管道
+                timeSinceLastPipe += dt;
+                if (timeSinceLastPipe > CONFIG.pipeSpawnRate) { createPipe(); timeSinceLastPipe = 0; }
+
+                // 管道逻辑
+                for (let i = pipes.length - 1; i >= 0; i--) {
+                    const group = pipes[i];
+                    group.position.x -= CONFIG.pipeSpeed * dt;
+
+                    // 碰撞检测
+                    if (Math.abs(group.position.x - pigGroup.position.x) < 3) {
+                        if (checkCollision(group)) gameOver();
+                    }
+
+                    // 加分
+                    if (!group.userData.passed && group.position.x < pigGroup.position.x) {
+                        score++;
+                        scoreEl.innerText = score;
+                        playScoreSound();
+                        group.userData.passed = true;
+                    }
+
+                    // 销毁
+                    if (group.position.x < -30) { scene.remove(group); pipes.splice(i, 1); }
+                }
+            }
+
+            // 4. 更新粒子
+            for (let i = inkParticles.length - 1; i >= 0; i--) {
+                const p = inkParticles[i];
+                p.life -= dt;
+                p.mesh.position.x -= 5 * dt; // 粒子向后飘
+                p.mesh.rotation.z += dt;
+                p.mesh.material.opacity = p.life;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    inkParticles.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        initThree();
+    </script>
+</body>
+
+</html>

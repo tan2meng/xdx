@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>老子请客 - 谁是那个SB？</title>
+    
+    <!-- 引入 Google Fonts: LXGW WenKai TC -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- 人脸识别库 -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- 撒花特效库 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- 手势识别库 (MediaPipe Hands) -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --accent-color: #00ffcc;
+            --danger-color: #ff0055;
+            /* 定义字体变量 */
+            --main-font: "LXGW WenKai TC", cursive, -apple-system, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            /* 应用字体 */
+            font-family: var(--main-font);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 噪点纹理层 */
+        .texture-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            position: absolute;
+            opacity: 0; 
+            pointer-events: none;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            object-fit: cover;
+        }
+
+        /* UI 层 */
+        .ui-layer {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none; 
+        }
+
+        /* 毛玻璃按钮 */
+        #start-btn {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            color: white;
+            /* 按钮字体需要显式设置 */
+            font-family: var(--main-font);
+            font-size: 24px;
+            font-weight: 700;
+            padding: 15px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
+            opacity: 0.5; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #start-btn.active {
+            opacity: 1;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            background: rgba(0, 255, 204, 0.2);
+            border-color: #00ffcc;
+        }
+        
+        #start-btn.gesture-detected {
+            background: rgba(255, 204, 0, 0.3);
+            border-color: #ffcc00;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 结果文字 */
+        #result-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            /* 字体设置 */
+            font-family: var(--main-font);
+            font-size: 80px;
+            font-weight: 700;
+            color: #ffcc00;
+            text-shadow: 
+                3px 3px 0 #ff0055,
+                -1px -1px 0 #ff0055,  
+                1px -1px 0 #ff0055,
+                -1px 1px 0 #ff0055,
+                1px 1px 0 #ff0055;
+            z-index: 200;
+            white-space: nowrap;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        #result-text.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* 竖屏提示 */
+        #portrait-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-family: var(--main-font);
+        }
+
+        @media (orientation: portrait) {
+            #portrait-warning {
+                display: flex;
+            }
+        }
+
+        .loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            line-height: 1.5;
+            font-family: var(--main-font);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="texture-overlay"></div>
+
+    <div id="portrait-warning">
+        <h1>请横屏使用</h1>
+        <p>为了获得最佳体验，请旋转您的手机</p>
+    </div>
+
+    <div id="container">
+        <div class="loading-text" id="loading-msg">正在加载人脸与手势模型...<br>可能需要几秒钟</div>
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+        
+        <div class="ui-layer">
+            <button id="start-btn" disabled>老子请客</button>
+        </div>
+        
+        <div id="result-text">这SB请客</div>
+    </div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const startBtn = document.getElementById('start-btn');
+    const resultText = document.getElementById('result-text');
+    const loadingMsg = document.getElementById('loading-msg');
+    const ctx = canvas.getContext('2d');
+
+    let detections = [];
+    let isGameRunning = false;
+    let isGameOver = false;
+    let selectedFaceIndex = -1;
+    
+    // 手势相关变量
+    let handsDetector;
+    let gestureHoldCounter = 0;
+    const GESTURE_TRIGGER_THRESHOLD = 15; // 需要保持手势约 15 帧 (0.5秒左右)
+    let isHandModelLoaded = false;
+    let isFaceModelLoaded = false;
+
+    // 1. 初始化模型
+    async function initModels() {
+        try {
+            // 加载人脸模型
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+            isFaceModelLoaded = true;
+            checkLoadStatus();
+
+            // 加载手势模型
+            handsDetector = new Hands({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }});
+            
+            handsDetector.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 0, // 0 性能最快，1 精度一般
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            handsDetector.onResults(onHandResults);
+            
+            // 预热一下似乎能防止第一次卡顿 (可选)
+            isHandModelLoaded = true;
+            checkLoadStatus();
+            
+            startVideo();
+        } catch (err) {
+            console.error(err);
+            loadingMsg.innerText = "模型加载失败：" + err.message;
+        }
+    }
+
+    function checkLoadStatus() {
+        if(isFaceModelLoaded && isHandModelLoaded) {
+            loadingMsg.innerText = "正在请求摄像头权限...";
+        }
+    }
+
+    // 2. 启动摄像头
+    function startVideo() {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user' 
+            } 
+        })
+        .then(stream => {
+            video.srcObject = stream;
+            loadingMsg.style.display = 'none';
+        })
+        .catch(err => {
+            console.error(err);
+            loadingMsg.innerText = "无法访问摄像头，请允许权限";
+        });
+    }
+
+    // 手势检测回调
+    function onHandResults(results) {
+        if (isGameRunning || isGameOver || detections.length === 0) {
+            gestureHoldCounter = 0;
+            return;
+        }
+
+        let victoryDetected = false;
+
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const landmarks = results.multiHandLandmarks[0];
+            if (isVictoryGesture(landmarks)) {
+                victoryDetected = true;
+            }
+        }
+
+        if (victoryDetected) {
+            gestureHoldCounter++;
+            
+            // 更新按钮UI提示
+            if (gestureHoldCounter > 2) {
+                startBtn.classList.add('gesture-detected');
+                startBtn.innerText = `保持✌️手势... ${Math.max(0, Math.ceil((GESTURE_TRIGGER_THRESHOLD - gestureHoldCounter)/5))}`;
+            }
+
+            // 触发游戏
+            if (gestureHoldCounter >= GESTURE_TRIGGER_THRESHOLD) {
+                gestureHoldCounter = 0;
+                startBtn.classList.remove('gesture-detected');
+                startGame();
+            }
+        } else {
+            gestureHoldCounter = 0;
+            if (startBtn.classList.contains('gesture-detected')) {
+                startBtn.classList.remove('gesture-detected');
+                // 恢复原文本将在主循环中处理
+            }
+        }
+    }
+
+    // 判断是否是剪刀手 (简单的几何判断)
+    function isVictoryGesture(landmarks) {
+        // 关键点索引: 
+        // 0: 手腕, 8: 食指尖, 6: 食指根部(PIP)
+        // 12: 中指尖, 10: 中指根部
+        // 16: 无名指尖, 14: 无名指根部
+        // 20: 小指尖, 18: 小指根部
+
+        const indexTip = landmarks[8];
+        const indexPip = landmarks[6];
+        const middleTip = landmarks[12];
+        const middlePip = landmarks[10];
+        const ringTip = landmarks[16];
+        const ringPip = landmarks[14];
+        const pinkyTip = landmarks[20];
+        const pinkyPip = landmarks[18];
+
+        // 简单的距离原点(手腕)判断
+        const wrist = landmarks[0];
+        function dist(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        const isIndexOpen = dist(indexTip, wrist) > dist(indexPip, wrist);
+        const isMiddleOpen = dist(middleTip, wrist) > dist(middlePip, wrist);
+        const isRingClosed = dist(ringTip, wrist) < dist(ringPip, wrist) * 1.2; 
+        const isPinkyClosed = dist(pinkyTip, wrist) < dist(pinkyPip, wrist) * 1.2;
+        const isSpread = dist(indexTip, middleTip) > 0.05; 
+
+        return isIndexOpen && isMiddleOpen && isRingClosed && isPinkyClosed && isSpread;
+    }
+
+    // 3. 视频播放与画布绘制循环
+    video.addEventListener('play', () => {
+        const displaySize = { width: window.innerWidth, height: window.innerHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        window.addEventListener('resize', () => {
+            const newSize = { width: window.innerWidth, height: window.innerHeight };
+            faceapi.matchDimensions(canvas, newSize);
+        });
+
+        // 限制手势检测频率，避免卡顿
+        let frameCounter = 0;
+
+        async function loop() {
+            if (video.paused || video.ended) return;
+
+            const displaySize = { width: canvas.width, height: canvas.height };
+            frameCounter++;
+
+            // A. 人脸检测
+            if (!isGameOver) {
+                const rawDetections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                detections = faceapi.resizeResults(rawDetections, displaySize);
+            }
+
+            // B. 手势检测 (每3帧做一次)
+            if (handsDetector && !isGameRunning && !isGameOver && frameCounter % 3 === 0) {
+                await handsDetector.send({image: video});
+            }
+
+            // C. 绘制画面
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制镜像视频
+            const vRatio = video.videoWidth / video.videoHeight;
+            const cRatio = canvas.width / canvas.height;
+            let sx, sy, sWidth, sHeight;
+            
+            if (cRatio > vRatio) {
+                sWidth = video.videoWidth;
+                sHeight = video.videoWidth / cRatio;
+                sx = 0;
+                sy = (video.videoHeight - sHeight) / 2;
+            } else {
+                sWidth = video.videoHeight * cRatio;
+                sHeight = video.videoHeight;
+                sx = (video.videoWidth - sWidth) / 2;
+                sy = 0;
+            }
+
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.translate(-canvas.width, 0);
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            // D. UI状态更新
+            if (detections.length > 0 && !isGameRunning && !isGameOver) {
+                startBtn.disabled = false;
+                startBtn.classList.add('active');
+                if (gestureHoldCounter === 0) {
+                    startBtn.innerText = `点击或比✌️ (${detections.length}人)`;
+                }
+            } else if (detections.length === 0 && !isGameRunning) {
+                startBtn.disabled = true;
+                startBtn.classList.remove('active');
+                startBtn.innerText = "寻找人脸中...";
+                gestureHoldCounter = 0;
+            }
+
+            // E. 绘制人脸圈
+            detections.forEach((det, i) => {
+                const box = det.box;
+                const x = canvas.width - (box.x + box.width);
+                const y = box.y;
+                const centerX = x + box.width / 2;
+                const centerY = y + box.height / 2;
+                const radius = Math.min(box.width, box.height) / 1.5;
+
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.lineWidth = 3;
+                
+                if (isGameRunning) {
+                    if (i === selectedFaceIndex) {
+                        ctx.strokeStyle = '#00ffcc';
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = '#00ffcc';
+                    } else {
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                        ctx.shadowBlur = 0;
+                    }
+                } else if (isGameOver) {
+                    if (i === selectedFaceIndex) {
+                        ctx.strokeStyle = '#ff0055';
+                        ctx.lineWidth = 8;
+                        ctx.shadowBlur = 30;
+                        ctx.shadowColor = '#ff0055';
+                        const pulse = Math.sin(Date.now() / 100) * 10;
+                        ctx.arc(centerX, centerY, radius + 20 + pulse, 0, 2 * Math.PI);
+                    } else {
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0)';
+                    }
+                } else {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(loop);
+        }
+        loop();
+    });
+
+    // 4. 游戏逻辑
+    function startGame() {
+        if (isGameRunning || detections.length === 0) return;
+        
+        isGameRunning = true;
+        isGameOver = false;
+        startBtn.style.opacity = '0'; 
+        gestureHoldCounter = 0; // 重置手势
+        playClickSound();
+
+        let speed = 100;
+        let rounds = 0;
+        const totalRounds = 30 + Math.random() * 10;
+
+        const roulette = () => {
+            selectedFaceIndex = Math.floor(Math.random() * detections.length);
+            playBeepSound();
+
+            rounds++;
+            
+            if (rounds < totalRounds) {
+                if (rounds > totalRounds - 10) speed += 30;
+                if (rounds > totalRounds - 5) speed += 60;
+                setTimeout(roulette, speed);
+            } else {
+                endGame();
+            }
+        };
+
+        roulette();
+    }
+
+    startBtn.addEventListener('click', startGame);
+
+    function endGame() {
+        isGameOver = true;
+        isGameRunning = false;
+        
+        playWinSound();
+        
+        confetti({
+            particleCount: 150,
+            spread: 100,
+            origin: { y: 0.6 },
+            colors: ['#ff0055', '#00ffcc', '#ffffff', '#ffcc00']
+        });
+
+        resultText.classList.add('show');
+        
+        setTimeout(() => {
+            resultText.classList.remove('show');
+            startBtn.style.opacity = '1';
+            startBtn.classList.remove('active');
+            startBtn.classList.remove('gesture-detected');
+            isGameOver = false;
+            selectedFaceIndex = -1;
+        }, 5000);
+    }
+
+    // 5. 音效合成
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playClickSound() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function playBeepSound() {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function playWinSound() {
+        const t = audioCtx.currentTime;
+        
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(100, t);
+        osc1.frequency.linearRampToValueAtTime(50, t + 1);
+        gain1.gain.setValueAtTime(0.3, t);
+        gain1.gain.linearRampToValueAtTime(0, t + 1.5);
+        
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(400, t);
+        osc2.frequency.setValueAtTime(600, t + 0.2);
+        osc2.frequency.setValueAtTime(400, t + 0.4);
+        gain2.gain.setValueAtTime(0.2, t);
+        gain2.gain.linearRampToValueAtTime(0, t + 1);
+
+        osc1.start(); osc1.stop(t + 1.5);
+        osc2.start(); osc2.stop(t + 1);
+    }
+
+    document.addEventListener('touchstart', function() {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    });
+
+    initModels();
+
+</script>
+</body>
+</html>
