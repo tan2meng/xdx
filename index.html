@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小東西</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚫</text></svg>">
+
+</head>
+
+<body class="dark-mode">
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="theme-toggle">
+        <button id="toggle-theme" aria-label="Toggle Dark Mode">
+            <svg class="sun-icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon" viewBox="0 0 24 24">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <header class="site-header">
+        <h1>小東西</h1>
+    </header>
+
+    <main class="container">
+        <section class="category" id="tools-section">
+            <h2 class="category-title">Tools</h2>
+            <div class="cards-grid" id="tools-grid">
+                <!-- Cards injected by JS -->
+            </div>
+            <div class="pagination" id="tools-pagination"></div>
+        </section>
+
+        <div class="divider"></div>
+
+        <section class="category" id="games-section">
+            <h2 class="category-title">Games</h2>
+            <div class="cards-grid" id="games-grid">
+                <!-- Cards injected by JS -->
+            </div>
+            <div class="pagination" id="games-pagination"></div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>vibe coding 的一些小東西</p>
+    </footer>
+
+    <script src="data.js"></script>
+    <script src="background.js"></script>
+    <script src="main.js"></script>
+
+</body>
+
+</html>
